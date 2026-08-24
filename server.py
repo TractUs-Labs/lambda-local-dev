@@ -145,6 +145,45 @@ async def _stop_service(name: str) -> None:
                 pass
 
 
+async def _restart_sam(name: str, svc: dict, env_vars: dict) -> None:
+    procs = PROCS.get(name)
+    if not procs:
+        return
+
+    sam_proc = procs.get("sam")
+    if sam_proc:
+        try:
+            sam_proc.terminate()
+        except ProcessLookupError:
+            pass
+        try:
+            await asyncio.wait_for(sam_proc.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
+            try:
+                sam_proc.kill()
+            except ProcessLookupError:
+                pass
+
+    base_env = os.environ.copy()
+    base_env.update(env_vars)
+
+    backend_path = env_vars.get("BACKEND_PATH", "")
+    sam_port = svc["sam_port"]
+    extra_args = svc.get("sam_extra_args", "").split() if svc.get("sam_extra_args") else []
+
+    sam_cmd = ["sam", "local", "start-lambda", "--env-vars", "env.json", "--port", str(sam_port)] + extra_args
+    new_sam_proc = await asyncio.create_subprocess_exec(
+        *sam_cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+        cwd=f"{backend_path}/functions/{name}",
+        env=base_env,
+    )
+
+    procs["sam"] = new_sam_proc
+    asyncio.create_task(_read_stream(name, "sam", new_sam_proc.stdout))
+
+
 def _find_service(name: str) -> Optional[dict]:
     for svc in load_services():
         if svc["name"] == name:
@@ -179,6 +218,18 @@ async def restart_service(name: str):
         return JSONResponse({"error": f"Unknown service: {name}"}, status_code=404)
     await _stop_service(name)
     await _start_service(name, svc, load_env())
+    return {"ok": True}
+
+
+@app.post("/api/services/{service_id}/restart-sam")
+@app.post("/services/{service_id}/restart-sam")
+async def restart_sam_endpoint(service_id: str):
+    svc = _find_service(service_id)
+    if not svc:
+        return JSONResponse({"error": f"Unknown service: {service_id}"}, status_code=404)
+    if get_status(service_id) != "running":
+        return JSONResponse({"error": f"Service {service_id} is not running"}, status_code=400)
+    await _restart_sam(service_id, svc, load_env())
     return {"ok": True}
 
 

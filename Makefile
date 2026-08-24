@@ -1,7 +1,7 @@
 BACKEND_PATH ?= $(shell grep ^BACKEND_PATH .overmind.env | cut -d= -f2)
 
 .PHONY: build-email-bot build-template-handler build-generate-contract build-send-notification build-utils build-metal-data-processing build-all \
-        clean-email-bot clean-template-handler clean-generate-contract clean-send-notification clean-utils clean-metal-data-processing clean-all
+        clean-email-bot clean-template-handler clean-generate-contract clean-send-notification clean-utils clean-metal-data-processing clean-all test
 
 build-email-bot:
 	cd $(BACKEND_PATH)/functions/email-bot && sam build --use-container
@@ -44,3 +44,6 @@ clean-metal-data-processing:
 
 clean-all:
 	$(MAKE) clean-email-bot clean-template-handler clean-generate-contract clean-send-notification clean-utils clean-metal-data-processing
+
+test:
+	pytest
