@@ -79,6 +79,77 @@ def test_build_unknown_service_returns_404(monkeypatch, tmp_path):
     resp = client.post("/api/services/nonexistent/build")
     assert resp.status_code == 404
 
+
+def test_restart_sam_unknown_service_returns_404(monkeypatch, tmp_path):
+    _setup_files(tmp_path, monkeypatch)
+    import importlib, sys
+    sys.modules.pop("server", None)
+    import server
+    importlib.reload(server)
+    client = TestClient(server.app)
+    resp = client.post("/api/services/nonexistent/restart-sam")
+    assert resp.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_restart_sam_only_preserves_tunnel_url(monkeypatch, tmp_path):
+    _setup_files(tmp_path, monkeypatch)
+    import importlib, sys
+    sys.modules.pop("server", None)
+    import server
+    importlib.reload(server)
+
+    class DummyProc:
+        def __init__(self):
+            self.returncode = None
+            self.stdout = asyncio.StreamReader()
+
+        def terminate(self):
+            self.returncode = 0
+
+        def kill(self):
+            self.returncode = -9
+
+        async def wait(self):
+            return self.returncode
+
+    old_sam = DummyProc()
+    proxy = DummyProc()
+    tunnel = DummyProc()
+    server.PROCS["email-bot"] = {"sam": old_sam, "proxy": proxy, "tunnel": tunnel}
+    server.TUNNEL_URLS["email-bot"] = "https://fixed.trycloudflare.com"
+
+    new_sam = DummyProc()
+    with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=new_sam)):
+        async with AsyncClient(transport=ASGITransport(app=server.app), base_url="http://test") as ac:
+            resp = await ac.post("/api/services/email-bot/restart-sam")
+
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
+    assert server.PROCS["email-bot"]["sam"] is new_sam
+    assert server.PROCS["email-bot"]["proxy"] is proxy
+    assert server.PROCS["email-bot"]["tunnel"] is tunnel
+    assert server.TUNNEL_URLS["email-bot"] == "https://fixed.trycloudflare.com"
+
+
+@pytest.mark.anyio
+async def test_restart_sam_only_falls_back_to_full_start(monkeypatch, tmp_path):
+    _setup_files(tmp_path, monkeypatch)
+    import importlib, sys
+    sys.modules.pop("server", None)
+    import server
+    importlib.reload(server)
+
+    with patch.object(server, "_stop_service", new=AsyncMock()) as stop_mock, patch.object(server, "_start_service", new=AsyncMock()) as start_mock:
+        async with AsyncClient(transport=ASGITransport(app=server.app), base_url="http://test") as ac:
+            resp = await ac.post("/api/services/email-bot/restart-sam")
+
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
+    assert "note" in resp.json()
+    stop_mock.assert_awaited_once_with("email-bot")
+    assert start_mock.await_count == 1
+
 def test_websocket_log_replay(monkeypatch, tmp_path):
     _setup_files(tmp_path, monkeypatch)
     import importlib, sys

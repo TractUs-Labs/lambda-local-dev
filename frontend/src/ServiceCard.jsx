@@ -3,7 +3,7 @@ import { CopyIcon, ExpandIcon } from "./components/icons";
 
 const TABS = ["sam", "proxy", "tunnel", "build"];
 
-export default function ServiceCard({ service, onStart, onStop, onRestart, onBuild, onClean, onKillPorts, onFocus }) {
+export default function ServiceCard({ service, onStart, onStop, onRestart, onRestartSam, onBuild, onClean, onKillPorts, onFocus }) {
   const { name, sam_port, proxy_port, status, tunnel_url } = service;
   const [activeTab, setActiveTab] = useState("sam");
   const [logs, setLogs] = useState({ sam: [], proxy: [], tunnel: [], build: [] });
@@ -66,6 +66,7 @@ export default function ServiceCard({ service, onStart, onStop, onRestart, onBui
           <button className="btn btn-start" disabled={disabled} onClick={onStart}>Start</button>
           <button className="btn" disabled={disabled} onClick={onStop}>Stop</button>
           <button className="btn" disabled={disabled} onClick={onRestart}>Restart</button>
+          <button className="btn" disabled={disabled} onClick={onRestartSam}>Restart SAM only</button>
           <button className="btn" disabled={disabled} onClick={onBuild}>
             {status === "building" ? "Building…" : "Build"}
           </button>

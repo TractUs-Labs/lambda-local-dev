@@ -46,6 +46,7 @@ export default function App() {
         onStart={() => action(focusedSvc.name, "start")}
         onStop={() => action(focusedSvc.name, "stop")}
         onRestart={() => action(focusedSvc.name, "restart")}
+        onRestartSam={() => action(focusedSvc.name, "restart-sam")}
         onBuild={() => action(focusedSvc.name, "build")}
         onClean={() => action(focusedSvc.name, "clean")}
         onKillPorts={() => action(focusedSvc.name, "kill-ports")}
@@ -70,6 +71,7 @@ export default function App() {
             onStart={() => action(svc.name, "start")}
             onStop={() => action(svc.name, "stop")}
             onRestart={() => action(svc.name, "restart")}
+            onRestartSam={() => action(svc.name, "restart-sam")}
             onBuild={() => action(svc.name, "build")}
             onClean={() => action(svc.name, "clean")}
             onKillPorts={() => action(svc.name, "kill-ports")}

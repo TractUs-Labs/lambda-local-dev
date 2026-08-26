@@ -145,6 +145,55 @@ async def _stop_service(name: str) -> None:
                 pass
 
 
+async def _stop_process(proc: asyncio.subprocess.Process) -> None:
+    try:
+        proc.terminate()
+    except ProcessLookupError:
+        return
+
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=5.0)
+    except asyncio.TimeoutError:
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+
+
+async def _restart_sam_only(name: str, svc: dict, env_vars: dict) -> bool:
+    procs = PROCS.get(name)
+    if not procs:
+        return False
+
+    existing_tunnel = procs.get("tunnel")
+    existing_proxy = procs.get("proxy")
+    existing_sam = procs.get("sam")
+    if not existing_tunnel or not existing_proxy:
+        return False
+
+    if existing_sam:
+        await _stop_process(existing_sam)
+
+    base_env = os.environ.copy()
+    base_env.update(env_vars)
+    backend_path = env_vars.get("BACKEND_PATH", "")
+    sam_port = svc["sam_port"]
+    extra_args = svc.get("sam_extra_args", "").split() if svc.get("sam_extra_args") else []
+    sam_cmd = ["sam", "local", "start-lambda", "--env-vars", "env.json", "--port", str(sam_port)] + extra_args
+
+    sam_proc = await asyncio.create_subprocess_exec(
+        *sam_cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+        cwd=f"{backend_path}/functions/{name}",
+        env=base_env,
+    )
+
+    PROCS[name] = {"sam": sam_proc, "proxy": existing_proxy, "tunnel": existing_tunnel}
+    asyncio.create_task(_read_stream(name, "sam", sam_proc.stdout))
+    return True
+
+
 def _find_service(name: str) -> Optional[dict]:
     for svc in load_services():
         if svc["name"] == name:
@@ -180,6 +229,21 @@ async def restart_service(name: str):
     await _stop_service(name)
     await _start_service(name, svc, load_env())
     return {"ok": True}
+
+
+@app.post("/api/services/{name}/restart-sam")
+async def restart_sam_service(name: str):
+    svc = _find_service(name)
+    if not svc:
+        return JSONResponse({"error": f"Unknown service: {name}"}, status_code=404)
+
+    restarted = await _restart_sam_only(name, svc, load_env())
+    if restarted:
+        return {"ok": True}
+
+    await _stop_service(name)
+    await _start_service(name, svc, load_env())
+    return {"ok": True, "note": "service was not running; started full stack"}
 
 
 @app.post("/api/services/{name}/build")

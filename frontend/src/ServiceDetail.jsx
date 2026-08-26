@@ -3,7 +3,7 @@ import { CopyIcon } from "./components/icons";
 
 const TABS = ["sam", "proxy", "tunnel", "build"];
 
-export default function ServiceDetail({ service, onBack, onStart, onStop, onRestart, onBuild, onClean, onKillPorts }) {
+export default function ServiceDetail({ service, onBack, onStart, onStop, onRestart, onRestartSam, onBuild, onClean, onKillPorts }) {
   const { name, sam_port, proxy_port, status, tunnel_url } = service;
   const [activeTab, setActiveTab] = useState("sam");
   const [logs, setLogs] = useState({ sam: [], proxy: [], tunnel: [], build: [] });
@@ -64,6 +64,7 @@ export default function ServiceDetail({ service, onBack, onStart, onStop, onRest
         <button className="btn btn-start" disabled={disabled} onClick={onStart}>Start</button>
         <button className="btn" disabled={disabled} onClick={onStop}>Stop</button>
         <button className="btn" disabled={disabled} onClick={onRestart}>Restart</button>
+        <button className="btn" disabled={disabled} onClick={onRestartSam}>Restart SAM only</button>
         <button className="btn" disabled={disabled} onClick={onBuild}>
           {status === "building" ? "Building…" : "Build"}
         </button>
