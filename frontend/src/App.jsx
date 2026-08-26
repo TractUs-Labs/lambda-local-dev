@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useTheme } from "next-themes";
 import ServiceCard from "./ServiceCard.jsx";
 import ServiceDetail from "./ServiceDetail.jsx";
+
+const themeOrder = ["system", "light", "dark"];
 
 export default function App() {
   const [services, setServices] = useState([]);
   const [focusedService, setFocusedService] = useState(null);
+  const { theme, setTheme } = useTheme();
 
   const fetchServices = useCallback(async () => {
     try {
@@ -28,6 +32,13 @@ export default function App() {
 
   const running = services.filter((s) => s.status === "running").length;
   const building = services.filter((s) => s.status === "building").length;
+
+  const cycleTheme = useCallback(() => {
+    const currentTheme = themeOrder.includes(theme) ? theme : "system";
+    const currentIndex = themeOrder.indexOf(currentTheme);
+    const nextTheme = themeOrder[(currentIndex + 1) % themeOrder.length];
+    setTheme(nextTheme);
+  }, [theme, setTheme]);
 
   const summary = () => {
     if (services.length === 0) return null;
@@ -53,6 +64,8 @@ export default function App() {
     );
   }
 
+  const themeLabel = theme || "system";
+
   return (
     <div className="app">
       <header className="app-header">
@@ -60,7 +73,12 @@ export default function App() {
           <span className="app-title-mark">⬡</span>
           tract-us dev
         </div>
-        <div className="app-summary">{summary()}</div>
+        <div className="app-header-right">
+          <button type="button" className="theme-toggle" onClick={cycleTheme}>
+            Theme: {themeLabel.charAt(0).toUpperCase() + themeLabel.slice(1)}
+          </button>
+          <div className="app-summary">{summary()}</div>
+        </div>
       </header>
       <div className="service-grid">
         {services.map((svc) => (
