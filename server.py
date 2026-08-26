@@ -145,6 +145,46 @@ async def _stop_service(name: str) -> None:
                 pass
 
 
+async def _stop_process(proc: asyncio.subprocess.Process) -> None:
+    try:
+        proc.terminate()
+    except ProcessLookupError:
+        return
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=5.0)
+    except asyncio.TimeoutError:
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+
+
+async def _rotate_tunnel(name: str, svc: dict, env_vars: dict) -> bool:
+    procs = PROCS.get(name)
+    if not procs:
+        return False
+
+    tunnel_proc = procs.get("tunnel")
+    if not tunnel_proc or tunnel_proc.returncode is not None:
+        return False
+
+    base_env = os.environ.copy()
+    base_env.update(env_vars)
+
+    await _stop_process(tunnel_proc)
+    TUNNEL_URLS.pop(name, None)
+
+    new_tunnel_proc = await asyncio.create_subprocess_exec(
+        "cloudflared", "tunnel", "--url", f"http://localhost:{svc['proxy_port']}",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+        env=base_env,
+    )
+    procs["tunnel"] = new_tunnel_proc
+    asyncio.create_task(_read_stream(name, "tunnel", new_tunnel_proc.stdout))
+    return True
+
+
 def _find_service(name: str) -> Optional[dict]:
     for svc in load_services():
         if svc["name"] == name:
@@ -179,6 +219,18 @@ async def restart_service(name: str):
         return JSONResponse({"error": f"Unknown service: {name}"}, status_code=404)
     await _stop_service(name)
     await _start_service(name, svc, load_env())
+    return {"ok": True}
+
+
+@app.post("/api/services/{name}/rotate-tunnel")
+async def rotate_tunnel(name: str):
+    svc = _find_service(name)
+    if not svc:
+        return JSONResponse({"error": f"Unknown service: {name}"}, status_code=404)
+
+    ok = await _rotate_tunnel(name, svc, load_env())
+    if not ok:
+        return JSONResponse({"error": f"Service not running: {name}"}, status_code=409)
     return {"ok": True}
 
 

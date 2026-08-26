@@ -127,6 +127,74 @@ def test_kill_ports_known_service_returns_ok(monkeypatch, tmp_path):
     assert resp.json()["ok"] is True
 
 
+def test_rotate_tunnel_unknown_service_returns_404(monkeypatch, tmp_path):
+    _setup_files(tmp_path, monkeypatch)
+    import importlib, sys
+    sys.modules.pop("server", None)
+    import server
+    importlib.reload(server)
+    client = TestClient(server.app)
+    resp = client.post("/api/services/nonexistent/rotate-tunnel")
+    assert resp.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_rotate_tunnel_not_running_returns_409(monkeypatch, tmp_path):
+    _setup_files(tmp_path, monkeypatch)
+    import importlib, sys
+    sys.modules.pop("server", None)
+    import server
+    importlib.reload(server)
+
+    async with AsyncClient(transport=ASGITransport(app=server.app), base_url="http://test") as ac:
+        resp = await ac.post("/api/services/email-bot/rotate-tunnel")
+    assert resp.status_code == 409
+
+
+@pytest.mark.anyio
+async def test_rotate_tunnel_restarts_only_tunnel_process(monkeypatch, tmp_path):
+    _setup_files(tmp_path, monkeypatch)
+    import importlib, sys
+    sys.modules.pop("server", None)
+    import server
+    importlib.reload(server)
+
+    class FakeProc:
+        def __init__(self, returncode=None):
+            self.returncode = returncode
+            self.stdout = AsyncMock()
+            self.terminate = Mock()
+            self.kill = Mock()
+            self.wait = AsyncMock(return_value=0)
+
+    sam_proc = FakeProc()
+    proxy_proc = FakeProc()
+    old_tunnel_proc = FakeProc()
+    new_tunnel_proc = FakeProc()
+
+    server.PROCS["email-bot"] = {
+        "sam": sam_proc,
+        "proxy": proxy_proc,
+        "tunnel": old_tunnel_proc,
+    }
+    server.TUNNEL_URLS["email-bot"] = "https://old.trycloudflare.com"
+
+    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=new_tunnel_proc)) as create_exec, \
+         patch("asyncio.create_task", Mock()):
+        async with AsyncClient(transport=ASGITransport(app=server.app), base_url="http://test") as ac:
+            resp = await ac.post("/api/services/email-bot/rotate-tunnel")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True}
+    assert old_tunnel_proc.terminate.called
+    assert old_tunnel_proc.wait.await_count == 1
+    assert server.PROCS["email-bot"]["sam"] is sam_proc
+    assert server.PROCS["email-bot"]["proxy"] is proxy_proc
+    assert server.PROCS["email-bot"]["tunnel"] is new_tunnel_proc
+    assert "email-bot" not in server.TUNNEL_URLS
+    create_exec.assert_awaited_once()
+
+
 @pytest.mark.anyio
 async def test_kill_ports_logs_emitted(monkeypatch, tmp_path):
     _setup_files(tmp_path, monkeypatch)

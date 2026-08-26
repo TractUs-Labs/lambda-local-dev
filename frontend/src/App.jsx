@@ -49,6 +49,7 @@ export default function App() {
         onBuild={() => action(focusedSvc.name, "build")}
         onClean={() => action(focusedSvc.name, "clean")}
         onKillPorts={() => action(focusedSvc.name, "kill-ports")}
+        onRotateTunnel={() => action(focusedSvc.name, "rotate-tunnel")}
       />
     );
   }
@@ -73,6 +74,7 @@ export default function App() {
             onBuild={() => action(svc.name, "build")}
             onClean={() => action(svc.name, "clean")}
             onKillPorts={() => action(svc.name, "kill-ports")}
+            onRotateTunnel={() => action(svc.name, "rotate-tunnel")}
             onFocus={() => setFocusedService(svc.name)}
           />
         ))}
