@@ -82,25 +82,30 @@ async def _read_stream(name: str, process_type: str, stream: asyncio.StreamReade
             await q.put(msg)
 
 
-async def _start_service(name: str, svc: dict, env_vars: dict) -> None:
-    base_env = os.environ.copy()
-    base_env.update(env_vars)
-
-    backend_path = env_vars.get("BACKEND_PATH", "")
-    dev_path = env_vars.get("DEV_PATH", "")
+async def _spawn_sam(name: str, svc: dict, base_env: dict) -> asyncio.subprocess.Process:
+    backend_path = base_env.get("BACKEND_PATH", "")
     sam_port = svc["sam_port"]
-    proxy_port = svc["proxy_port"]
-    function_name = svc.get("function_name", "FunctionImp")
     extra_args = svc.get("sam_extra_args", "").split() if svc.get("sam_extra_args") else []
-
     sam_cmd = ["sam", "local", "start-lambda", "--env-vars", "env.json", "--port", str(sam_port)] + extra_args
-    sam_proc = await asyncio.create_subprocess_exec(
+    return await asyncio.create_subprocess_exec(
         *sam_cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
         cwd=f"{backend_path}/functions/{name}",
         env=base_env,
     )
+
+
+async def _start_service(name: str, svc: dict, env_vars: dict) -> None:
+    base_env = os.environ.copy()
+    base_env.update(env_vars)
+
+    dev_path = env_vars.get("DEV_PATH", "")
+    sam_port = svc["sam_port"]
+    proxy_port = svc["proxy_port"]
+    function_name = svc.get("function_name", "FunctionImp")
+
+    sam_proc = await _spawn_sam(name, svc, base_env)
 
     proxy_env = base_env.copy()
     proxy_env["LAMBDA_PORT"] = str(sam_port)
@@ -127,6 +132,21 @@ async def _start_service(name: str, svc: dict, env_vars: dict) -> None:
     asyncio.create_task(_read_stream(name, "tunnel", tunnel_proc.stdout))
 
 
+async def _stop_proc(proc: asyncio.subprocess.Process) -> None:
+    try:
+        proc.terminate()
+    except ProcessLookupError:
+        return
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=5.0)
+    except asyncio.TimeoutError:
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+        await proc.wait()
+
+
 async def _stop_service(name: str) -> None:
     procs = PROCS.pop(name, {})
     TUNNEL_URLS.pop(name, None)
@@ -143,6 +163,23 @@ async def _stop_service(name: str) -> None:
                 proc.kill()
             except ProcessLookupError:
                 pass
+
+
+async def _restart_sam_only(name: str, svc: dict, env_vars: dict) -> Optional[str]:
+    """Restart only the SAM process. Returns an error message, or None on success."""
+    procs = PROCS.get(name)
+    if not procs or "sam" not in procs:
+        return "Service is not running; start it first"
+
+    old_sam = procs["sam"]
+    await _stop_proc(old_sam)
+
+    base_env = os.environ.copy()
+    base_env.update(env_vars)
+    sam_proc = await _spawn_sam(name, svc, base_env)
+    procs["sam"] = sam_proc
+    asyncio.create_task(_read_stream(name, "sam", sam_proc.stdout))
+    return None
 
 
 def _find_service(name: str) -> Optional[dict]:
@@ -173,13 +210,23 @@ async def stop_service(name: str):
 
 
 @app.post("/api/services/{name}/restart")
-async def restart_service(name: str):
+async def restart_service(name: str, scope: str = "all"):
     svc = _find_service(name)
     if not svc:
         return JSONResponse({"error": f"Unknown service: {name}"}, status_code=404)
+    if scope not in ("all", "sam"):
+        return JSONResponse(
+            {"error": f"Invalid scope: {scope}. Use 'all' or 'sam'."},
+            status_code=400,
+        )
+    if scope == "sam":
+        err = await _restart_sam_only(name, svc, load_env())
+        if err:
+            return JSONResponse({"error": err}, status_code=409)
+        return {"ok": True, "scope": "sam"}
     await _stop_service(name)
     await _start_service(name, svc, load_env())
-    return {"ok": True}
+    return {"ok": True, "scope": "all"}
 
 
 @app.post("/api/services/{name}/build")
