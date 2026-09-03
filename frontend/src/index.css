@@ -1,5 +1,32 @@
 /* ── tokens ──────────────────────────────────────────── */
-:root {
+:root,
+.light {
+  --bg: #F7F9FC;
+  --surface: #FFFFFF;
+  --surface-hi: #EEF3FB;
+  --border: #D7E1F0;
+  --border-hi: #C4D3E8;
+
+  --text: #162339;
+  --text-2: #4A607F;
+  --text-3: #7990AF;
+
+  --amber: #B86C00;
+  --amber-dim: rgba(184, 108, 0, 0.10);
+  --amber-border: rgba(184, 108, 0, 0.35);
+
+  --green: #1F9D73;
+  --green-dim: rgba(31, 157, 115, 0.08);
+  --green-border: rgba(31, 157, 115, 0.35);
+
+  --red: #C43B3B;
+  --red-dim: rgba(196, 59, 59, 0.08);
+  --red-border: rgba(196, 59, 59, 0.30);
+
+  --log-bg: #F3F7FD;
+}
+
+.dark {
   --bg: #07091A;
   --surface: #0D1127;
   --surface-hi: #111830;
@@ -21,6 +48,8 @@
   --red: #F87171;
   --red-dim: rgba(248, 113, 113, 0.08);
   --red-border: rgba(248, 113, 113, 0.30);
+
+  --log-bg: #050710;
 }
 
 /* ── reset ───────────────────────────────────────────── */
@@ -89,6 +118,31 @@ button {
 }
 
 .app-title-mark {
+  color: var(--amber);
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.theme-toggle {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.theme-toggle:hover {
+  border-color: var(--amber-border);
+  background: var(--amber-dim);
   color: var(--amber);
 }
 
@@ -376,7 +430,7 @@ button {
 .log-pane {
   height: 180px;
   overflow-y: auto;
-  background: #050710;
+  background: var(--log-bg);
   padding: 8px 14px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
@@ -501,7 +555,7 @@ button {
 .detail-log-pane {
   height: clamp(280px, calc(100vh - 420px), 560px);
   overflow-y: auto;
-  background: #050710;
+  background: var(--log-bg);
   padding: 8px 12px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
