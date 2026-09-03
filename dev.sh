@@ -9,7 +9,7 @@ print(' '.join(s['name'] for s in svcs))
 ")
 
 if [[ $# -eq 0 ]]; then
-  echo "Usage: ./dev.sh <service> [service...] | --all | stop | restart <service>"
+  echo "Usage: ./dev.sh <service> [service...] | --all | stop | restart <service> [--sam]"
   echo "Services: $VALID_SERVICES"
   exit 1
 fi
@@ -24,11 +24,24 @@ fi
 
 if [[ "$1" == "restart" ]]; then
   if [[ $# -lt 2 ]]; then
-    echo "Usage: ./dev.sh restart <service>"
+    echo "Usage: ./dev.sh restart <service> [--sam]"
     exit 1
   fi
   svc="$2"
-  exec overmind restart "${svc}-sam" "${svc}-proxy" "${svc}-tunnel"
+  if ! echo "$VALID_SERVICES" | grep -qw "$svc"; then
+    echo "Unknown service: $svc"
+    echo "Valid services: $VALID_SERVICES"
+    exit 1
+  fi
+  if [[ $# -eq 2 ]]; then
+    exec overmind restart "${svc}-sam" "${svc}-proxy" "${svc}-tunnel"
+  fi
+  if [[ $# -eq 3 && "$3" == "--sam" ]]; then
+    # Restart SAM only — keeps proxy and tunnel (and tunnel URL) running
+    exec overmind restart "${svc}-sam"
+  fi
+  echo "Usage: ./dev.sh restart <service> [--sam]"
+  exit 1
 fi
 
 procs=""

@@ -48,10 +48,14 @@ overmind connect email-bot-tunnel   # see the URL — Ctrl+b d to detach
 ### 4. Manage processes
 
 ```bash
+./dev.sh restart email-bot          # restart SAM + proxy + tunnel (new tunnel URL)
+./dev.sh restart email-bot --sam    # restart SAM only — keeps proxy, tunnel, and tunnel URL
 overmind restart email-bot-proxy    # restart a single process
 overmind connect email-bot-sam      # attach to a process terminal
 overmind stop                       # stop everything
 ```
+
+Dashboard Restart control: primary button restarts everything; the dropdown also offers **Restart SAM only**.
 
 ## Port Reference
 
@@ -67,7 +71,7 @@ overmind stop                       # stop everything
 ## Notes
 
 - **metal-data-processing** requires an `env.json` in `functions/metal-data-processing/` before first use. Use `FunctionImpl` as the top-level key (not `FunctionImp`).
-- Tunnel URLs are ephemeral — they change every time the tunnel process restarts.
+- Tunnel URLs are ephemeral — they change every time the tunnel process restarts. Use `./dev.sh restart <service> --sam` (or **Restart SAM only** in the UI) to reload Lambda code without rotating the URL.
 - `.overmind.env` is gitignored (contains absolute paths).
 
 ## Adding a new lambda
