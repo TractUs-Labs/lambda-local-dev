@@ -5,9 +5,13 @@ Makefile from it, dev.sh derives VALID_SERVICES from it, and server.py reads it
 per-request. A malformed entry or a duplicated port breaks all three at once.
 """
 import json
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
-SERVICES_FILE = Path(__file__).parent.parent / "services.json"
+REPO_ROOT = Path(__file__).parent.parent
+SERVICES_FILE = REPO_ROOT / "services.json"
 REQUIRED_KEYS = {"name", "sam_port", "proxy_port", "function_name"}
 
 
@@ -50,3 +54,43 @@ def test_agent_core_forces_envtype_dev():
     """
     svc = next(s for s in _services() if s["name"] == "agent-core")
     assert svc.get("sam_extra_args") == "--parameter-overrides EnvType=dev"
+
+
+def test_ports_are_ints_in_valid_range():
+    for svc in _services():
+        for key in ("sam_port", "proxy_port"):
+            port = svc[key]
+            assert isinstance(port, int) and not isinstance(port, bool), (
+                f"{svc['name']}.{key} must be an int, got {type(port).__name__} ({port!r})"
+            )
+            assert 1024 <= port <= 65535, (
+                f"{svc['name']}.{key} = {port} is outside the valid port range 1024-65535"
+            )
+
+
+def test_generated_files_match_services_json(tmp_path):
+    """Procfile and Makefile are generated from services.json by generate.py.
+
+    Regenerates both files in a scratch copy of the repo and byte-compares
+    them against what's checked in. If this fails, services.json was edited
+    without regenerating the derived files -- run `python3 generate.py` from
+    the repo root and commit the results.
+    """
+    shutil.copy(REPO_ROOT / "generate.py", tmp_path / "generate.py")
+    shutil.copy(SERVICES_FILE, tmp_path / "services.json")
+
+    result = subprocess.run(
+        [sys.executable, "generate.py"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"generate.py failed: {result.stdout}\n{result.stderr}"
+
+    for filename in ("Procfile", "Makefile"):
+        generated = (tmp_path / filename).read_bytes()
+        checked_in = (REPO_ROOT / filename).read_bytes()
+        assert generated == checked_in, (
+            f"{filename} is out of sync with services.json. "
+            f"Run `python3 generate.py` from the repo root and commit the result."
+        )

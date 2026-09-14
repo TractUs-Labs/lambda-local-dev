@@ -72,6 +72,7 @@ Dashboard Restart control: primary button restarts everything; the dropdown also
 ## Notes
 
 - **metal-data-processing** requires an `env.json` in `functions/metal-data-processing/` before first use. Use `FunctionImpl` as the top-level key (not `FunctionImp`).
+- **agent-core** requires an `env.json` in `functions/agent-core/` before first use. Copy `functions/agent-core/.env.example.json` as the template; the top-level key is `FunctionImp`.
 - Tunnel URLs are ephemeral — they change every time the tunnel process restarts. Use `./dev.sh restart <service> --sam` (or **Restart SAM only** in the UI) to reload Lambda code without rotating the URL.
 - `.overmind.env` is gitignored (contains absolute paths).
 
