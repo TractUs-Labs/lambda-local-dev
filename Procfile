@@ -21,3 +21,7 @@ utils-tunnel: cloudflared tunnel --url http://localhost:8084
 metal-data-processing-sam:    cd $BACKEND_PATH/functions/metal-data-processing && sam local start-lambda --env-vars env.json --parameter-overrides EnvType=dev --port 3006
 metal-data-processing-proxy:  FUNCTION_NAME=FunctionImpl LAMBDA_PORT=3006 PROXY_PORT=8085 python3 $DEV_PATH/proxy.py
 metal-data-processing-tunnel: cloudflared tunnel --url http://localhost:8085
+
+agent-core-sam:    cd $BACKEND_PATH/functions/agent-core && sam local start-lambda --env-vars env.json --parameter-overrides EnvType=dev --port 3007
+agent-core-proxy:  LAMBDA_PORT=3007 PROXY_PORT=8086 python3 $DEV_PATH/proxy.py
+agent-core-tunnel: cloudflared tunnel --url http://localhost:8086
