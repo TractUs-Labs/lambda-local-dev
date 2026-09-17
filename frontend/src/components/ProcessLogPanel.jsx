@@ -13,9 +13,12 @@ const SEVERITY_CLASS = {
   default: "text-muted-foreground",
 }
 
-function LogPane({ lines, tall, endRef }) {
+function LogPane({ lines, tall, viewportRef }) {
   return (
-    <ScrollArea className={cn(tall ? "h-[clamp(280px,calc(100vh-26rem),560px)]" : "h-[180px]")}>
+    <ScrollArea
+      viewportRef={viewportRef}
+      className={cn(tall ? "h-[clamp(280px,calc(100vh-26rem),560px)]" : "h-45")}
+    >
       {lines.length === 0 ? (
         <Empty>
           <EmptyHeader>
@@ -23,13 +26,12 @@ function LogPane({ lines, tall, endRef }) {
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="p-3 font-mono text-xs break-all">
+        <div className="p-3 font-mono text-xs whitespace-pre-wrap wrap-break-word">
           {lines.map((line, i) => (
             <div key={i} className={SEVERITY_CLASS[classifyLogLine(line)]}>
               {line}
             </div>
           ))}
-          <div ref={endRef} />
         </div>
       )}
     </ScrollArea>
@@ -39,7 +41,7 @@ function LogPane({ lines, tall, endRef }) {
 export default function ProcessLogPanel({ name, tall = false }) {
   const [activeTab, setActiveTab] = useState("sam")
   const [logs, setLogs] = useState({ sam: [], proxy: [], tunnel: [], build: [] })
-  const endRef = useRef(null)
+  const viewportRef = useRef(null)
 
   useEffect(() => {
     const proto = window.location.protocol === "https:" ? "wss" : "ws"
@@ -55,7 +57,8 @@ export default function ProcessLogPanel({ name, tall = false }) {
   }, [name])
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" })
+    const el = viewportRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [logs, activeTab])
 
   return (
@@ -69,7 +72,7 @@ export default function ProcessLogPanel({ name, tall = false }) {
       </TabsList>
       {TABS.map((tab) => (
         <TabsContent key={tab} value={tab}>
-          <LogPane lines={logs[tab]} tall={tall} endRef={endRef} />
+          <LogPane lines={logs[tab]} tall={tall} viewportRef={viewportRef} />
         </TabsContent>
       ))}
     </Tabs>
