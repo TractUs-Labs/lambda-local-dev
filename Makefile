@@ -1,7 +1,7 @@
 BACKEND_PATH ?= $(shell grep ^BACKEND_PATH .overmind.env | cut -d= -f2)
 
-.PHONY: build-email-bot build-template-handler build-generate-contract build-send-notification build-utils build-metal-data-processing build-all \
-        clean-email-bot clean-template-handler clean-generate-contract clean-send-notification clean-utils clean-metal-data-processing clean-all
+.PHONY: build-email-bot build-template-handler build-generate-contract build-send-notification build-utils build-metal-data-processing build-agent-core build-all \
+        clean-email-bot clean-template-handler clean-generate-contract clean-send-notification clean-utils clean-metal-data-processing clean-agent-core clean-all
 
 build-email-bot:
 	cd $(BACKEND_PATH)/functions/email-bot && sam build --use-container
@@ -21,8 +21,11 @@ build-utils:
 build-metal-data-processing:
 	cd $(BACKEND_PATH)/functions/metal-data-processing && sam build --use-container
 
+build-agent-core:
+	cd $(BACKEND_PATH)/functions/agent-core && sam build --use-container
+
 build-all:
-	$(MAKE) build-email-bot build-template-handler build-generate-contract build-send-notification build-utils build-metal-data-processing
+	$(MAKE) build-email-bot build-template-handler build-generate-contract build-send-notification build-utils build-metal-data-processing build-agent-core
 
 clean-email-bot:
 	rm -rf $(BACKEND_PATH)/functions/email-bot/.aws-sam
@@ -42,5 +45,8 @@ clean-utils:
 clean-metal-data-processing:
 	rm -rf $(BACKEND_PATH)/functions/metal-data-processing/.aws-sam
 
+clean-agent-core:
+	rm -rf $(BACKEND_PATH)/functions/agent-core/.aws-sam
+
 clean-all:
-	$(MAKE) clean-email-bot clean-template-handler clean-generate-contract clean-send-notification clean-utils clean-metal-data-processing
+	$(MAKE) clean-email-bot clean-template-handler clean-generate-contract clean-send-notification clean-utils clean-metal-data-processing clean-agent-core

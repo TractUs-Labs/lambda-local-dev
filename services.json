@@ -36,6 +36,13 @@
       "proxy_port": 8085,
       "function_name": "FunctionImpl",
       "sam_extra_args": "--parameter-overrides EnvType=dev"
+    },
+    {
+      "name": "agent-core",
+      "sam_port": 3007,
+      "proxy_port": 8086,
+      "function_name": "FunctionImp",
+      "sam_extra_args": "--parameter-overrides EnvType=dev"
     }
   ]
 }
